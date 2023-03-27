@@ -93,8 +93,8 @@ def check_response(response: dict) -> bool:
     elif len(response['homeworks']) > 0:
         if response['homeworks'][0]['status'] not in HOMEWORK_VERDICTS:
             raise exceptions.NoMatchStatusHomework(
-            'Неизвестный статус домашней работы, обнаруженный в ответе API'
-        )
+                'Неизвестный статус домашней работы, обнаруженный в ответе API'
+            )
         else:
             return True
 
