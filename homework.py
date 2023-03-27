@@ -12,9 +12,9 @@ import exceptions
 load_dotenv()
 
 
-PRACTICUM_TOKEN: str | None = os.getenv('PRACTICUM_TOKEN')
-TELEGRAM_TOKEN: str | None = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID: str | None = os.getenv('TELEGRAM_CHAT_ID')
+PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN')
+TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID: str = os.getenv('TELEGRAM_CHAT_ID')
 
 formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -90,12 +90,13 @@ def check_response(response: dict) -> bool:
         raise KeyError('Отсутствуют ожидаемые ключи в ответе API')
     if type(response['homeworks']) != list:
         raise TypeError('Значение ключа ответа API - не список')
-    elif response['homeworks'][0]['status'] not in HOMEWORK_VERDICTS:
-        raise exceptions.NoMatchStatusHomework(
+    elif len(response['homeworks']) > 0:
+        if response['homeworks'][0]['status'] not in HOMEWORK_VERDICTS:
+            raise exceptions.NoMatchStatusHomework(
             'Неизвестный статус домашней работы, обнаруженный в ответе API'
         )
-    else:
-        return True
+        else:
+            return True
 
 
 def parse_status(homework: dict) -> str:
