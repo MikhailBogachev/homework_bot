@@ -134,7 +134,7 @@ def main():
             )
         )
     bot: telegram.Bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp: int = int(time.time()) - 600000
+    timestamp: int = int(time.time())
     last_error = None
 
     while True:
