@@ -3,6 +3,7 @@ import sys
 import logging
 import time
 from dotenv import load_dotenv
+from http import HTTPStatus
 
 import requests
 import telegram
@@ -40,12 +41,12 @@ HOMEWORK_VERDICTS: dict[str, str] = {
 
 def check_tokens() -> bool:
     """Функция для проверки наличия необходимых переменных окружения."""
-    for var in [PRACTICUM_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN]:
-        if not var:
-            logger.critical('Отсутствует переменная окружения')
-            raise exceptions.MissingEnviromentVariable(
-                'Отсутствует переменная окружения'
-            )
+    list_env_vars = [PRACTICUM_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN]
+    if not all(list_env_vars):
+        logger.critical('Отсутствует переменная окружения')
+        raise exceptions.MissingEnviromentVariable(
+            'Отсутствует переменная окружения'
+        )
     return True
 
 
@@ -69,14 +70,14 @@ def get_api_answer(timestamp: int) -> dict:
         })
     except requests.exceptions.RequestException:
         raise exceptions.GetRequestError('Сбой при запросе к эндпоинту')
-    if response.status_code != 200:
+    if response.status_code != HTTPStatus.OK:
         raise exceptions.StatusCodeNotOK(
             f'Статус запроса не ОК! Статус запроса: {response.status_code}'
         )
     try:
         answer = response.json()
     except Exception:
-        raise exceptions.JsonConveringError('Ошибка при представлении json')
+        raise exceptions.JsonConvertingError('Ошибка при представлении json')
     else:
         return answer
 
@@ -84,38 +85,56 @@ def get_api_answer(timestamp: int) -> dict:
 def check_response(response: dict) -> bool:
     """Функция для проверки корректности ответа API."""
     try:
-        response['homeworks']
+        logger.info('Проверяем ответ API: TRY')
+        homeworks = response['homeworks']
         response['current_date']
     except KeyError:
         raise KeyError('Отсутствуют ожидаемые ключи в ответе API')
-    if type(response['homeworks']) != list:
+    if not isinstance(homeworks, list):
         raise TypeError('Значение ключа ответа API - не список')
-    elif len(response['homeworks']) > 0:
-        if response['homeworks'][0]['status'] not in HOMEWORK_VERDICTS:
+    elif len(homeworks) > 0:
+        if homeworks[0]['status'] not in HOMEWORK_VERDICTS:
             raise exceptions.NoMatchStatusHomework(
-                'Неизвестный статус домашней работы, обнаруженный в ответе API'
+                'Неизвестный статус домашней работы в ответе API'
             )
         else:
+            logger.info('Проверяем ответ API: OK')
             return True
+    else:
+        logger.info('Проверяем ответ API: OK (No changes)')
+    return False
 
 
 def parse_status(homework: dict) -> str:
     """Функция для подготовки сообщения для отправки в чат телеграмм."""
-    try:
-        homework_name = homework['homework_name']
-        verdict = HOMEWORK_VERDICTS[homework['status']]
-    except KeyError:
-        raise exceptions.IncorrectHomeworkStatus(
-            'Пустой или недокументированный статус домашней работы'
-        )
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    if isinstance(homework, dict):
+        for key in ['homework_name', 'status']:
+            if key not in homework:
+                raise KeyError(
+                    f'В homework не оказалось ключа {key}'
+                )
+        homework_name = homework.get('homework_name')
+        verdict = HOMEWORK_VERDICTS.get(homework.get('status'))
+        if not all((homework_name, verdict)):
+            raise exceptions.IncorrectHomeworkStatus(
+                'Пустой или недокументированный статус домашней работы'
+            )
+        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    else:
+        raise TypeError('homework не является словарем')
 
 
 def main():
     """Основная логика работы бота."""
-    check_tokens()
+    if not check_tokens():
+        sys.exit(
+            (
+                'Программа остановлена. ',
+                'Не обнаружены необходимые переменные окружения.'
+            )
+        )
     bot: telegram.Bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp: int = int(time.time()) - RETRY_PERIOD
+    timestamp: int = int(time.time()) - 600000
     last_error = None
 
     while True:
@@ -128,7 +147,8 @@ def main():
             if str(error) != str(last_error):
                 logger.error(message)
                 last_error = error
-        time.sleep(RETRY_PERIOD)
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':

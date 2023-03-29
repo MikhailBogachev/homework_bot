@@ -6,7 +6,7 @@ class StatusCodeNotOK(Exception):
     pass
 
 
-class JsonConveringError(Exception):
+class JsonConvertingError(Exception):
     pass
 
 
